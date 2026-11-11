@@ -6,9 +6,7 @@ client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
 def extract_and_decompile(jar_path, output_dir):
     os.makedirs(output_dir, exist_ok=True)
-    cfr_url = "https://github.com"
-    subprocess.run(["wget", "-q", cfr_url, "-O", "cfr.jar"])
-    subprocess.run(["java", "-jar", "cfr.jar", jar_path, "--outputdir", output_dir])
+    subprocess.run(["cfr", jar_path, "--outputdir", output_dir])
 
 def translate_to_rust(java_code):
     prompt = f"""
