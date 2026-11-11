@@ -13,10 +13,7 @@ jobs:
       - name: سحب ملفات المستودع
         uses: actions/checkout@v4
 
-      - name: تثبيت أداة فك التشفير CFR
-        run: sudo apt-get update && sudo apt-get install -y cfr
-
-      - name: تثبيت بيئة بايثون ولغة راست
+      - name: تثبيت بيئة لغة راست
         uses: dtolnay/rust-toolchain@stable
 
       - name: تثبيت مكتبة Gemini
