@@ -1,0 +1,50 @@
+name: Run Rust Mod Converter
+
+on:
+  push:
+    paths:
+      - 'input_mod.jar'
+  workflow_dispatch:
+
+jobs:
+  build-and-convert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: سحب ملفات المستودع
+        uses: actions/checkout@v4
+
+      - name: تثبيت بيئة بايثون ولغة راست
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: تثبيت مكتبة Gemini
+        run: pip install google-genai
+
+      - name: تشغيل الذكاء الاصطناعي لترجمة المود
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python app.py
+
+      - name: تجهيز ملف إعدادات مشروع راست
+        run: |
+          cat << 'EOF' > rust_mod/Cargo.toml
+          [package]
+          name = "horizon_converted_mod"
+          version = "0.1.0"
+          edition = "2021"
+
+          [lib]
+          crate-type = ["cdylib"]
+          EOF
+
+      - name: تجميع المود النهائي (Compile)
+        working-directory: ./rust_mod
+        run: cargo build --release || echo "يحتاج لمراجعة يدوية للكود"
+
+      - name: رفع المود الجاهز للتحميل
+        uses: actions/upload-artifact@v4
+        with:
+          name: Converted-Horizon-Mod
+          path: |
+            rust_mod/src/lib.rs
+            rust_mod/target/release/*.so
+            rust_mod/target/release/*.dll
