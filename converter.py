@@ -1,43 +1,72 @@
-import os
-import zipfile
-import subprocess
-import google.generativeai as genai
+name: Run Rust Mod Converter
 
-# إعداد مفتاح Gemini من أسرار المستودع
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-model = genai.GenerativeModel('gemini-2.5-pro')
+on:
+  push:
+    paths:
+      - 'input_mod.jar'
+  workflow_dispatch:
 
-def extract_and_decompile(jar_path, output_dir):
-    os.makedirs(output_dir, exist_ok=True)
-    # تحميل أداة CFR لفك تشفير الجافا مجاناً
-    subprocess.run(["wget", "-q", "https://github.com", "-O", "cfr.jar"])
-    subprocess.run(["java", "-jar", "cfr.jar", jar_path, "--outputdir", output_dir])
+jobs:
+  build-and-convert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: سحب ملفات المستودع
+        uses: actions/checkout@v4
 
-def translate_to_rust(java_code):
-    prompt = f"""
-    أنت خبير في لغة Rust وتطوير مودات محرك Horizon-Rust للعبة ماين كرافت.
-    قم بتحويل كود مود الجافا التالي إلى كود Rust كامل وصحيح، مع الالتزام الصارم بقواعد الذاكرة (Ownership) في Rust.
-    أعطني كود ملف lib.rs فقط بدون أي شرح إضافي أو علامات تنسيق Markdown.
+      - name: تثبيت بيئة راست ومعماريات الأندرويد والكمبيوتر
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, x86_64-unknown-linux-gnu, x86_64-pc-windows-gnu
 
-    كود الجافا:
-    {java_code}
-    """
-    response = model.generate_content(prompt)
-    return response.text.replace("```rust", "").replace("```", "").strip()
+      - name: تثبيت أدوات التجميع للكمبيوتر
+        run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
 
-if __name__ == "__main__":
-    jar_file = "input_mod.jar"
-    if os.path.exists(jar_file):
-        extract_and_decompile(jar_file, "decompiled_java")
-        all_java_code = ""
-        for root, _, files in os.walk("decompiled_java"):
-            for file in files:
-                if file.endswith(".java"):
-                    with open(os.path.join(root, file), "r", encoding="utf-8", errors="ignore") as f:
-                        all_java_code += f"\n// File: {file}\n" + f.read()
-        
-        rust_code = translate_to_rust(all_java_code[:30000]) # قراءة أول 30 ألف حرف لتجنب تجاوز الحد المجاني
-        os.makedirs("rust_mod/src", exist_ok=True)
-        with open("rust_mod/src/lib.rs", "w", encoding="utf-8") as f:
-            f.write(rust_code)
-        print("تمت الترجمة بنجاح!")
+      - name: تثبيت مكتبة Gemini
+        run: pip install google-genai
+
+      - name: تشغيل الذكاء الاصطناعي لترجمة المود
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python app.py
+
+      - name: تجهيز ملف إعدادات مشروع راست بالمكتبات الأساسية
+        run: |
+          cat << 'EOF' > rust_mod/Cargo.toml
+          [package]
+          name = "horizon_converted_mod"
+          version = "0.1.0"
+          edition = "2021"
+
+          [lib]
+          crate-type = ["cdylib"]
+
+          [dependencies]
+          log = "0.4"
+          lazy_static = "1.4"
+          parking_lot = "0.12"
+          serde = { version = "1.0", features = ["derive"] }
+          serde_json = "1.0"
+          EOF
+
+      - name: تجميع المود حسب اختيار المستخدم
+        working-directory: ./rust_mod
+        env:
+          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER: /usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang
+        run: |
+          PLATFORM=$(cat ../target_platform.txt 2>/dev/null || echo "android")
+          echo "المعمارية المختارة: $PLATFORM"
+          if [ "$PLATFORM" = "pc" ]; then
+            cargo build --release --target x86_64-unknown-linux-gnu || true
+            cargo build --release --target x86_64-pc-windows-gnu || true
+          else
+            cargo build --release --target aarch64-linux-android || true
+          fi
+
+      - name: رفع المود الجاهز للتحميل
+        uses: actions/upload-artifact@v4
+        with:
+          name: Converted-Horizon-Mod
+          path: |
+            rust_mod/src/lib.rs
+            rust_mod/target/*/release/*.so
+            rust_mod/target/*/release/*.dll
