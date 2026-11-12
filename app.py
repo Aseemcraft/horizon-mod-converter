@@ -22,13 +22,11 @@ def extract_jar(jar_path, extract_dir):
 def build_hmod_android(extract_dir, output_dir):
     os.makedirs(output_dir, exist_ok=True)
     
-    # نسخ مجلدات الأصول والبيانات (assets & data) من مود الجافا الأصلي
     for folder in ["assets", "data"]:
         src_folder = os.path.join(extract_dir, folder)
         if os.path.exists(src_folder):
             shutil.copytree(src_folder, os.path.join(output_dir, folder), dirs_exist_ok=True)
 
-    # قراءة معلومات المود الأصلية (fabric.mod.json أو mods.toml)
     mod_info = ""
     for info_file in ["fabric.mod.json", "META-INF/mods.toml"]:
         info_path = os.path.join(extract_dir, info_file)
@@ -36,7 +34,6 @@ def build_hmod_android(extract_dir, output_dir):
             with open(info_path, "r", encoding="utf-8", errors="ignore") as f:
                 mod_info += f.read()
 
-    # استخراج أسماء الكلاسات لفهم محتوى المود
     classes_summary = []
     for root, _, files in os.walk(extract_dir):
         for file in files:
@@ -69,10 +66,8 @@ def build_hmod_android(extract_dir, output_dir):
     with open(os.path.join(output_dir, "horizon-mod.toml"), "w", encoding="utf-8") as f:
         f.write(toml_content)
 
-    # ضغط المجلد بصيغة .hmod
     shutil.make_archive("converted_mod", 'zip', output_dir)
     os.rename("converted_mod.zip", "converted_mod.hmod")
-    print("تم إنشاء حزمة الأندرويد converted_mod.hmod بنجاح!")
 
 def build_hnmod_pc(extract_dir, output_dir):
     os.makedirs(os.path.join(output_dir, "src"), exist_ok=True)
@@ -124,7 +119,6 @@ crate-type = ["rlib"]
 
     shutil.make_archive("converted_mod", 'zip', output_dir)
     os.rename("converted_mod.zip", "converted_mod.hnmod")
-    print("تم إنشاء حزمة الكمبيوتر converted_mod.hnmod بنجاح!")
 
 if __name__ == "__main__":
     jar_file = "input_mod.jar"
@@ -139,4 +133,3 @@ if __name__ == "__main__":
         else:
             build_hmod_android("extracted_jar", "final_output/package")
             shutil.move("converted_mod.hmod", "final_output/converted_mod.hmod")
-
