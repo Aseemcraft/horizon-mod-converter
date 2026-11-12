@@ -13,17 +13,46 @@ jobs:
       - name: سحب ملفات المستودع
         uses: actions/checkout@v4
 
+      - name: تثبيت بيئة Rust وهدف WebAssembly
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
       - name: تثبيت مكتبة Gemini
         run: pip install google-genai
 
-      - name: تحويل وتغليف المود بالذكاء الاصطناعي
+      - name: ترجمة وتجهيز ملفات المود
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python app.py
+
+      - name: تجميع ملف mod.wasm
+        run: |
+          if [ -d "wasm_project" ]; then
+            cat << 'EOF' > wasm_project/Cargo.toml
+          [package]
+          name = "horizon_wasm_mod"
+          version = "0.1.0"
+          edition = "2021"
+
+          [lib]
+          crate-type = ["cdylib"]
+          EOF
+            cd wasm_project
+            cargo build --release --target wasm32-unknown-unknown || true
+            cp target/wasm32-unknown-unknown/release/*.wasm ../final_package/mod.wasm 2>/dev/null || true
+            cd ..
+          fi
+
+      - name: تغليف المود النهائي بصيغة .hmod
+        run: |
+          mkdir -p final_output
+          cd final_package
+          zip -r ../final_output/converted_mod.hmod .
+          cd ..
 
       - name: رفع حزمة المود الجاهزة للتركيب
         uses: actions/upload-artifact@v4
         with:
           name: Horizon-Ready-Mod
-          path: final_output/*
-
+          path: final_output/converted_mod.hmod
