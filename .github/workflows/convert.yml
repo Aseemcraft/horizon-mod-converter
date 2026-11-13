@@ -21,28 +21,10 @@ jobs:
       - name: تثبيت مكتبة Gemini
         run: pip install google-genai
 
-      - name: ترجمة وتجهيز ملفات المود
+      - name: ترجمة وتجميع المود إلى WebAssembly
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python app.py
-
-      - name: تجميع ملف mod.wasm
-        run: |
-          if [ -d "wasm_project" ]; then
-            cat << 'EOF' > wasm_project/Cargo.toml
-          [package]
-          name = "horizon_wasm_mod"
-          version = "0.1.0"
-          edition = "2021"
-
-          [lib]
-          crate-type = ["cdylib"]
-          EOF
-            cd wasm_project
-            cargo build --release --target wasm32-unknown-unknown || true
-            cp target/wasm32-unknown-unknown/release/*.wasm ../final_package/mod.wasm 2>/dev/null || true
-            cd ..
-          fi
 
       - name: تغليف المود النهائي بصيغة .hmod
         run: |
